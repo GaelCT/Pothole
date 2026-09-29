@@ -42,7 +42,12 @@ type Fixture = Pick<
   | "city_service_verified"
   | "publish_on_map"
   | "keep_city_request_private"
-> & { stripe: [number, number, number]; purpose: string };
+> & {
+  stripe: [number, number, number];
+  purpose: string;
+  /** Simulates a report the operator confirmed as filed. No city ID is invented. */
+  submittedAt?: string;
+};
 
 const fid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const label = (letter: string) => `[DEV FIXTURE ${letter}] Test location, not a real report`;
@@ -145,6 +150,40 @@ const FIXTURES: Fixture[] = [
     keep_city_request_private: 1,
     stripe: [150, 150, 150],
   },
+  {
+    id: fid(7),
+    purpose: "public + submitted to city (no city request ID shown)",
+    latitude: 35.385,
+    longitude: -119.02,
+    location_description: label("G"),
+    lane_direction: "Fixture lane note",
+    observed_at: "2026-09-18T11:10:00-07:00",
+    review_status: "verified",
+    duplicate_of: null,
+    location_verified: 1,
+    city_service_verified: 1,
+    publish_on_map: 1,
+    keep_city_request_private: 0,
+    submittedAt: "2026-09-19T09:30:00-07:00",
+    stripe: [240, 150, 90],
+  },
+  {
+    id: fid(8),
+    purpose: "public + submitted to city (no city request ID shown)",
+    latitude: 35.345,
+    longitude: -119.1,
+    location_description: label("H"),
+    lane_direction: null,
+    observed_at: "2026-09-19T15:45:00-07:00",
+    review_status: "verified",
+    duplicate_of: null,
+    location_verified: 1,
+    city_service_verified: 1,
+    publish_on_map: 1,
+    keep_city_request_private: 0,
+    submittedAt: "2026-09-21T10:05:00-07:00",
+    stripe: [200, 110, 160],
+  },
 ];
 
 const db = openDatabase(dbFilePath(dataDir));
@@ -153,12 +192,18 @@ const insert = db.prepare(`
   INSERT INTO potholes (
     id, latitude, longitude, location_description, lane_direction, observed_at,
     photo_path, review_status, duplicate_of, location_verified, city_service_verified,
-    publish_on_map, keep_city_request_private, is_fixture, created_at, updated_at
+    publish_on_map, keep_city_request_private, report_status, approved_snapshot,
+    approved_at, submitted_at, is_fixture, created_at, updated_at
   ) VALUES (
     @id, @latitude, @longitude, @location_description, @lane_direction, @observed_at,
     @photo_path, @review_status, @duplicate_of, @location_verified, @city_service_verified,
-    @publish_on_map, @keep_city_request_private, 1, @now, @now
+    @publish_on_map, @keep_city_request_private, @report_status, @approved_snapshot,
+    @approved_at, @submitted_at, 1, @now, @now
   )
+`);
+const insertAttempt = db.prepare(`
+  INSERT INTO report_attempts (id, pothole_id, snapshot, started_at, finished_at, outcome, notes)
+  VALUES (@id, @pothole_id, @snapshot, @started_at, @finished_at, 'submitted', @notes)
 `);
 
 let added = 0;
@@ -172,22 +217,49 @@ for (const f of FIXTURES) {
   if (!fs.existsSync(path.join(photosDir(dataDir), photoName))) {
     writePhoto(dataDir, fixturePng(f.stripe), f.id);
   }
-  insert.run({
-    id: f.id,
-    latitude: f.latitude,
-    longitude: f.longitude,
-    location_description: f.location_description,
-    lane_direction: f.lane_direction,
-    observed_at: f.observed_at,
-    photo_path: photoName,
-    review_status: f.review_status,
-    duplicate_of: f.duplicate_of,
-    location_verified: f.location_verified,
-    city_service_verified: f.city_service_verified,
-    publish_on_map: f.publish_on_map,
-    keep_city_request_private: f.keep_city_request_private,
-    now: new Date().toISOString(),
-  });
+  const snapshot = f.submittedAt
+    ? JSON.stringify({
+        fixture: true,
+        latitude: f.latitude,
+        longitude: f.longitude,
+        location_description: f.location_description,
+        lane_direction: f.lane_direction,
+        observed_at: f.observed_at,
+        photo_path: photoName,
+      })
+    : null;
+  db.transaction(() => {
+    insert.run({
+      id: f.id,
+      latitude: f.latitude,
+      longitude: f.longitude,
+      location_description: f.location_description,
+      lane_direction: f.lane_direction,
+      observed_at: f.observed_at,
+      photo_path: photoName,
+      review_status: f.review_status,
+      duplicate_of: f.duplicate_of,
+      location_verified: f.location_verified,
+      city_service_verified: f.city_service_verified,
+      publish_on_map: f.publish_on_map,
+      keep_city_request_private: f.keep_city_request_private,
+      report_status: f.submittedAt ? "submitted" : "not_sent",
+      approved_snapshot: snapshot,
+      approved_at: f.submittedAt ?? null,
+      submitted_at: f.submittedAt ?? null,
+      now: new Date().toISOString(),
+    });
+    if (f.submittedAt && snapshot) {
+      insertAttempt.run({
+        id: f.id.replace(/^00000000/, "a0000000"),
+        pothole_id: f.id,
+        snapshot,
+        started_at: f.submittedAt,
+        finished_at: f.submittedAt,
+        notes: "DEV FIXTURE: simulated filing, nothing was sent to the city.",
+      });
+    }
+  })();
   added++;
   console.log(`  added    ${f.id}  ${f.purpose}`);
 }

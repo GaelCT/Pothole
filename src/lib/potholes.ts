@@ -44,6 +44,9 @@ export type PublicPothole = {
   observedAt: string;
   reportStatus: ReportStatus;
   submittedAt: string | null;
+  /** Only what the city actually displayed; null otherwise. Never invented. */
+  cityRequestId: string | null;
+  cityRequestUrl: string | null;
   photoUrl: string;
   isFixture: boolean;
 };
@@ -58,6 +61,8 @@ function toPublic(row: PotholeRow): PublicPothole {
     observedAt: row.observed_at,
     reportStatus: row.report_status,
     submittedAt: row.submitted_at,
+    cityRequestId: row.city_request_id,
+    cityRequestUrl: row.city_request_url,
     photoUrl: `/api/photos/${row.id}`,
     isFixture: row.is_fixture === 1,
   };
@@ -66,6 +71,21 @@ function toPublic(row: PotholeRow): PublicPothole {
 export function listPublicPotholes(): PublicPothole[] {
   const rows = getDb()
     .prepare(`SELECT * FROM potholes WHERE ${publicWhere()} ORDER BY observed_at DESC`)
+    .all() as PotholeRow[];
+  return rows.map(toPublic);
+}
+
+/**
+ * Public records the operator has confirmed as submitted to the city.
+ * "Outcome unknown" is not included: an unconfirmed attempt is not a report.
+ */
+export function listReportedPublicPotholes(): PublicPothole[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM potholes
+       WHERE ${publicWhere()} AND report_status = 'submitted'
+       ORDER BY submitted_at DESC`,
+    )
     .all() as PotholeRow[];
   return rows.map(toPublic);
 }

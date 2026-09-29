@@ -195,3 +195,58 @@ td img {
   color: var(--muted);
   font-size: 0.875rem;
 }
+
+.map-section {
+  max-width: 72rem;
+  margin: 0 auto 3rem;
+  padding: 0 1rem;
+}
+
+.stack.wide {
+  max-width: none;
+}
+
+.map {
+  height: 420px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.map-error {
+  color: var(--error);
+  border: 1px solid var(--error);
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin: 0;
+}
+
+.map-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.map-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.map-list li.selected {
+  background: #eef4fb;
+}
+
+.map-popup p {
+  margin: 0.25rem 0;
+}
+
+.map-popup img {
+  display: block;
+  margin: 0.5rem 0;
+  object-fit: cover;
+  border-radius: 3px;
+}

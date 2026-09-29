@@ -13,7 +13,7 @@ Stage 1 findings are in [`docs/stage-1-reporting-feasibility.md`](docs/stage-1-r
 | --- | --- |
 | 1. Reporting feasibility | Done. Decision: manual filing, no form automation |
 | 2. App foundation | Done: database, private photos, admin sign-in, dev fixtures |
-| 3. Map interface | Not started |
+| 3. Map interface | Partial: map of potholes reported to the city, on `/login` (needs `MAPTILER_KEY`) |
 | 4. Review and report drafting | Not started |
 | 5. Manual filing support | Not started |
 | 6. Test and deploy | Not started |
@@ -64,8 +64,9 @@ Sign in at `/login` and go to `/admin`.
 
 ## Development fixtures
 
-`npm run db:seed-dev` loads six records covering each visibility case: two public, one needing
-review, one rejected, one duplicate, and one private. Their descriptions start with
+`npm run db:seed-dev` loads eight records covering each visibility case: two public, one needing
+review, one rejected, one duplicate, one private, and two public records marked as submitted to
+the city (with no city request number, since none was ever issued). Their descriptions start with
 `[DEV FIXTURE]`, and their photos are striped images stamped "DEV FIXTURE / NOT REAL".
 
 - The script refuses to run when `NODE_ENV=production`.
