@@ -13,7 +13,7 @@ Stage 1 findings are in [`docs/stage-1-reporting-feasibility.md`](docs/stage-1-r
 | --- | --- |
 | 1. Reporting feasibility | Done. Decision: manual filing, no form automation |
 | 2. App foundation | Done: database, private photos, admin sign-in, dev fixtures |
-| 3. Map interface | Partial: map of potholes reported to the city, on `/login` (needs `MAPTILER_KEY`) |
+| 3. Map interface | Done: public map on `/` with filters, list and a detail panel; map of reported potholes on `/login`; CSP. Map tiles need `MAPTILER_KEY` |
 | 4. Review and report drafting | Not started |
 | 5. Manual filing support | Not started |
 | 6. Test and deploy | Not started |
@@ -133,5 +133,21 @@ written by a newer schema.
 - Photos are stored exactly as uploaded. Removing EXIF/GPS metadata and redacting faces or
   plates is part of Stage 4 review. Records created through the admin form stay hidden until
   that review exists, so no uploaded photo can become public before then.
-- No Content-Security-Policy yet. It will be added with the Stage 3 map, once the tile and
-  script origins are known.
+- Real map tiles have not been tested yet, because no MapTiler key is configured. Everything
+  else on the map page works without a key and was tested.
+
+## Content-Security-Policy
+
+`src/proxy.ts` adds a per-request, nonce-based CSP to every HTML page, using the policy
+defined in `src/lib/csp.ts`.
+
+- **Scripts** run only if they carry the nonce, plus the chunks those scripts load.
+- **Third parties:** the only one is `https://api.maptiler.com`, for map tile images and the
+  key check. It is listed in `CSP_THIRD_PARTY_ORIGINS`; add any new origin there.
+- **Inline styles** are allowed because Leaflet positions the map with them.
+- **Production** adds `upgrade-insecure-requests`, and drops `'unsafe-eval'` (development
+  only).
+- **Pages render per request:** the root layout calls `connection()`, so every page is rendered
+  for each request and gets a fresh nonce.
+- **Excluded:** the proxy skips `/api/*` and static assets. Upload bodies never pass through it,
+  so they are never truncated at the 10 MB proxy body limit. It also does no authentication.

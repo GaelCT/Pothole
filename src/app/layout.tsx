@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,7 +12,13 @@ export const metadata: Metadata = {
     "An independent map of reviewed pothole observations in Bakersfield, CA. Not an official City of Bakersfield service.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // The CSP from src/proxy.ts carries a per-request nonce that Next.js stamps
+  // onto its <script> tags while rendering. A prerendered (static) page would
+  // ship un-nonced scripts that the policy blocks, so every page under this
+  // layout, including the built-in not-found page, must render per request.
+  await connection();
+
   return (
     <html lang="en">
       <body>

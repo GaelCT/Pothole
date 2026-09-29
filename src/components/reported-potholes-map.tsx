@@ -1,31 +1,10 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
-import type { CircleMarker, Map as LeafletMap } from "leaflet";
-
-/** Display-ready record. Dates are formatted on the server to avoid hydration drift. */
-export type MapPothole = {
-  id: string;
-  latitude: number;
-  longitude: number;
-  locationDescription: string;
-  laneDirection: string | null;
-  observedLabel: string;
-  submittedLabel: string | null;
-  cityRequestId: string | null;
-  /** Already checked on the server to be an http(s) URL. */
-  cityRequestUrl: string | null;
-  photoUrl: string;
-  isFixture: boolean;
-};
-
-const BAKERSFIELD: [number, number] = [35.3733, -119.0187];
-
-// Required by MapTiler's terms: MapTiler and OpenStreetMap attribution.
-const ATTRIBUTION =
-  '<a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer">&copy; MapTiler</a> ' +
-  '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">&copy; OpenStreetMap contributors</a>';
+import type { CircleMarker } from "leaflet";
+import type { MapPothole } from "@/lib/map-pothole";
+import { MapStatusMessages } from "./map/map-status";
+import { fitToPoints, useMapTilerMap } from "./map/use-maptiler-map";
 
 /**
  * Popup built with DOM APIs and textContent, never an HTML string, so record
@@ -74,6 +53,7 @@ function popupContent(p: MapPothole): HTMLElement {
   return root;
 }
 
+/** Map + list of records confirmed as reported to the city (login page). */
 export function ReportedPotholesMap({
   potholes,
   mapKey,
@@ -82,119 +62,55 @@ export function ReportedPotholesMap({
   mapKey: string | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef(new Map<string, CircleMarker>());
-  const [tileError, setTileError] = useState(false);
-  const [keyError, setKeyError] = useState<string | null>(null);
+  const { handle, keyError, tileError } = useMapTilerMap(containerRef, mapKey);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!mapKey || !containerRef.current) return;
-    let cancelled = false;
-    let map: LeafletMap | undefined;
+    if (!handle) return;
+    const { L, map } = handle;
     const markers = markersRef.current;
+    const layer = L.layerGroup().addTo(map);
 
-    // MapTiler answers a bad key with an "Invalid key" *image*, which the
-    // browser treats as a successful tile load. Check the key explicitly so a
-    // rejected key produces a visible error instead of a misleading map.
-    fetch(`https://api.maptiler.com/maps/streets-v4/tiles.json?key=${encodeURIComponent(mapKey)}`)
-      .then((res) => {
-        if (!cancelled && !res.ok) {
-          setKeyError(`MapTiler rejected the map key (HTTP ${res.status}).`);
-        }
+    for (const p of potholes) {
+      const marker = L.circleMarker([p.latitude, p.longitude], {
+        radius: 9,
+        weight: 2,
+        color: "#7a1f00",
+        fillColor: "#e8590c",
+        fillOpacity: 0.9,
       })
-      .catch(() => {
-        if (!cancelled) setKeyError("Could not reach MapTiler to load the map.");
-      });
-
-    // Leaflet touches `window` on import, so load it only in the browser.
-    void import("leaflet").then((L) => {
-      if (cancelled || !containerRef.current) return;
-      map = L.map(containerRef.current, {
-        center: BAKERSFIELD,
-        zoom: 12,
-        scrollWheelZoom: false,
-      });
-
-      L.tileLayer(
-        `https://api.maptiler.com/maps/streets-v4/{z}/{x}/{y}.png?key=${encodeURIComponent(mapKey)}`,
-        {
-          tileSize: 512,
-          zoomOffset: -1,
-          minZoom: 1,
-          maxZoom: 19,
-          attribution: ATTRIBUTION,
-          crossOrigin: true,
-        },
-      )
-        .on("tileerror", () => setTileError(true))
-        .addTo(map);
-
-      for (const p of potholes) {
-        const marker = L.circleMarker([p.latitude, p.longitude], {
-          radius: 9,
-          weight: 2,
-          color: "#7a1f00",
-          fillColor: "#e8590c",
-          fillOpacity: 0.9,
-        })
-          .bindTooltip(`Reported to city: ${p.locationDescription}`)
-          .bindPopup(() => popupContent(p), { maxWidth: 240 })
-          .on("click", () => setSelectedId(p.id))
-          .addTo(map);
-        markers.set(p.id, marker);
-      }
-
-      if (potholes.length > 1) {
-        map.fitBounds(
-          L.latLngBounds(potholes.map((p) => [p.latitude, p.longitude] as [number, number])),
-          { padding: [40, 40], maxZoom: 15 },
-        );
-      } else if (potholes.length === 1) {
-        map.setView([potholes[0].latitude, potholes[0].longitude], 15);
-      }
-      mapRef.current = map;
-    });
+        .bindTooltip(`Reported to city: ${p.locationDescription}`)
+        .bindPopup(() => popupContent(p), { maxWidth: 240 })
+        .on("click", () => setSelectedId(p.id))
+        .addTo(layer);
+      markers.set(p.id, marker);
+    }
+    fitToPoints(handle, potholes);
 
     return () => {
-      cancelled = true;
-      map?.remove();
-      mapRef.current = null;
+      layer.remove();
       markers.clear();
     };
-  }, [mapKey, potholes]);
+  }, [handle, potholes]);
 
   function showOnMap(p: MapPothole) {
     setSelectedId(p.id);
-    const map = mapRef.current;
     const marker = markersRef.current.get(p.id);
-    if (!map || !marker) return;
-    map.setView(marker.getLatLng(), Math.max(map.getZoom(), 15));
+    if (!handle || !marker) return;
+    handle.map.setView(marker.getLatLng(), Math.max(handle.map.getZoom(), 15));
     marker.openPopup();
     containerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   return (
     <div className="stack wide">
-      {!mapKey && (
-        <p role="alert" className="map-error">
-          Map unavailable: <code>MAPTILER_KEY</code> is not set in <code>.env.local</code>. The
-          list below still shows every reported pothole.
-        </p>
-      )}
-      {keyError && (
-        <p role="alert" className="map-error">
-          Map unavailable: {keyError} Check <code>MAPTILER_KEY</code> in <code>.env.local</code>{" "}
-          and that the key allows this site&apos;s address. The list below still shows every
-          reported pothole.
-        </p>
-      )}
-      {tileError && !keyError && (
-        <p role="alert" className="map-error">
-          Some map tiles failed to load. Check that the MapTiler key is valid and allows this
-          site&apos;s address.
-        </p>
-      )}
+      <MapStatusMessages
+        mapKey={mapKey}
+        keyError={keyError}
+        tileError={tileError}
+        fallback="The list below still shows every reported pothole."
+      />
       {mapKey && (
         <div
           ref={containerRef}
