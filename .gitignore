@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+build/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Playwright saved browser sessions may contain credentials
+playwright/.auth/
+storage-state.json
+test-results/
+playwright-report/
+
+# Local database and evidence photos (persistent volume data, not source)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+data/
+uploads/
+photos/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
