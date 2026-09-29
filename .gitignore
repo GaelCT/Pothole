@@ -1,30 +1,39 @@
 # Dependencies
-node_modules/
+/node_modules
+/.pnp
+.pnp.*
 
 # Next.js build output
-.next/
-out/
-build/
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# Testing
+/coverage
 
 # Environment and secrets
 .env
 .env.*
 !.env.example
+*.pem
 
-# Playwright saved browser sessions may contain credentials
-playwright/.auth/
-storage-state.json
-test-results/
-playwright-report/
-
-# Local database and evidence photos (persistent volume data, not source)
+# Runtime data: SQLite database and evidence photos live on the
+# persistent volume (DATA_DIR), never in source control
+/data/
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
-data/
-uploads/
-photos/
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
 # OS / editor noise
 .DS_Store
