@@ -91,6 +91,8 @@ City destination: [Bakersfield service-request form](https://bakersfieldca.citys
 
 The inspected page includes location selection, details, attachments, privacy, possible-duplicate handling, and login interfaces. The exact selectable pothole category and its category-specific questions were not established from the readable page. Claude must inspect that live flow before implementing its selectors. [1]
 
+Stage 1 added three qualifications. The attachment step carries a required marker, so a photo may be mandatory at the destination rather than only by this project's policy; treat that as apparent and unconfirmed. The label "Where is the request?" appears twice in the readable content, so the assumption that report type and location are cleanly separate steps is not yet verified. A notification-subscription prompt exists that this section originally missed, now added as step 6. Full unknown list at U1–U13 in `docs/stage-1-reporting-feasibility.md`.
+
 | City form step | What the script fills | What must be verified |
 | --- | --- | --- |
 | 1. Report type | The actual pothole category offered by the site | Exact current option, not an invented category ID |
@@ -98,6 +100,7 @@ The inspected page includes location selection, details, attachments, privacy, p
 | 3. Details | A factual description assembled from the reviewed record | Every question required for that category has a real answer |
 | 4. Media | The approved pothole photo | Current format/size restrictions and successful attachment display |
 | 5. Privacy | The explicitly approved private/public setting | Checkbox state matches the report preview |
+| 6. Notification subscription | The deliberately chosen subscribe-or-decline state | Added during Stage 1: the live page presents a notification-subscription prompt this five-step map omitted. Policy must be decided by the operator, not chosen by the script |
 
 **[Claude Opus 5 — CREATE]** A deterministic description builder, using this pattern:
 
@@ -127,8 +130,7 @@ Use stable, inspected labels/roles and normal Playwright waits, not guessed sele
 
 ### Launch conditions, not alternate implementations
 
-- Confirm that the city/provider permits this automated form use before enabling it against the live service. The terms page could not be retrieved during this review; permission is not established. [7]
-- Confirm the real pothole category, required questions, location controls, upload limits, authentication behavior, and receipt format through authorized inspection.
+- Confirm that the city/provider permits this automated form use before enabling it against the live service. The terms page has now been retrieved and reviewed; permission is **still not established**. The portal runs Granicus OneView, so two parties are potentially in scope: the City of Bakersfield and Granicus, Inc. The terms name no automation prohibition, but they restrict interface use to consuming the offered service and require prior written permission from an authorized Granicus officer for some activity. See `docs/stage-1-reporting-feasibility.md` section 2. [7]
 - Stop on CAPTCHA, MFA, access denial, rate limiting, unsupported category, or changed/unrecognized form controls. Do not bypass them or switch to an undocumented endpoint.
 - Use the site's actual duplicate review and your own local submission lock. These reduce duplicates; they do not create a guarantee of exactly-once delivery to a third-party site.
 - No unattended bulk submissions or scheduler in this version. Automation removes repetitive form filling; you remain responsible for verifying and approving each report.
@@ -139,7 +141,7 @@ Until these conditions are satisfied, city automation stays disabled. The websit
 
 | Stage | Claude Opus 5 creates | You provide or approve | Stage is finished when |
 | --- | --- | --- | --- |
-| 1. Confirm reporting feasibility | Form-inspection checklist and exact field map | Authorized account access and confirmation of permitted automation | Unknown required fields and submission constraints are documented; live automation remains gated if unresolved |
+| 1. Confirm reporting feasibility — **documentation complete, automation gated** | Form-inspection checklist and exact field map → delivered in `docs/stage-1-reporting-feasibility.md` | Authorized account access and confirmation of permitted automation — **still outstanding** | Unknown required fields and submission constraints are documented; live automation remains gated if unresolved |
 | 2. App foundation | Project, database, private photos, admin authentication, development-only fixtures | Map account configuration and chosen host | Records persist across restarts and public users cannot write |
 | 3. Map interface | Map, filters/list, detail panel, status labels | Layout and displayed information | Each approved record appears at its stored position with the correct photo |
 | 4. Review and report drafting | Pin editing, duplicate links, verification checks, draft builder, approval snapshots | Real location/evidence decisions and privacy choice | Invalid, duplicate, or unreviewed reports are blocked |
@@ -179,5 +181,5 @@ The design choices and approval workflow are this plan's recommendations, not cl
 4. [MapTiler: Leaflet integration](https://docs.maptiler.com/leaflet/) — map-provider integration and API-key configuration.
 5. [Playwright: Actions](https://playwright.dev/docs/input) — browser form actions and file inputs.
 6. [Playwright: Authentication](https://playwright.dev/docs/auth) — saved browser sessions and credential-safety warning.
-7. [Bakersfield portal: Terms](https://bakersfieldca.citysourced.com/terms) — identified, but its content could not be retrieved; automated-use permission remains unverified.
+7. [Bakersfield portal: Terms](https://bakersfieldca.citysourced.com/terms) — retrieved September 28, 2026 during Stage 1. Identifies the platform as Granicus OneView and its terms as last updated Nov 17, 2020. Automated-use permission remains unverified; the terms neither clearly grant nor unambiguously forbid it. Clause-level review in `docs/stage-1-reporting-feasibility.md`.
 8. [Next.js documentation](https://nextjs.org/docs/app) — application framework selected for this plan.
