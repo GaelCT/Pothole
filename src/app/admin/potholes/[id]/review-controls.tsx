@@ -1,15 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { createContext, useActionState, useContext, type ReactNode } from "react";
 import {
-  approveDraftAction,
-  markDuplicateAction,
-  revokeApprovalAction,
+  saveApprovalAction,
   saveDecisionsAction,
-  unlinkDuplicateAction,
+  saveDuplicateAction,
   type ActionState,
 } from "./actions";
 import { FormStatus } from "./form-status";
+
+/** Every review form sends the record id this way (see actions.ts for why it is not bound). */
+export function PotholeIdField({ potholeId }: { potholeId: string }) {
+  return <input type="hidden" name="pothole_id" value={potholeId} />;
+}
 
 export function DecisionsForm({
   potholeId,
@@ -26,15 +29,13 @@ export function DecisionsForm({
   };
   disabledReason: string | null;
 }) {
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(
-    saveDecisionsAction.bind(null, potholeId),
-    undefined,
-  );
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(saveDecisionsAction, undefined);
   const privacy =
     initial.keepCityRequestPrivate === null ? "undecided" : initial.keepCityRequestPrivate ? "private" : "public";
 
   return (
     <form action={formAction} className="stack wide">
+      <PotholeIdField potholeId={potholeId} />
       {disabledReason && <p className="hint">{disabledReason}</p>}
       <fieldset disabled={disabledReason !== null} className="stack wide plain">
         <fieldset>
@@ -96,44 +97,61 @@ export function DecisionsForm({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Duplicates: one hook and one result line for every duplicate form, so the
+// message survives the page switching between "link" and "unlink" controls.
+
+type DuplicateContextValue = { potholeId: string; formAction: (form: FormData) => void; pending: boolean };
+const DuplicateContext = createContext<DuplicateContextValue | null>(null);
+
+function useDuplicateContext(): DuplicateContextValue {
+  const value = useContext(DuplicateContext);
+  if (!value) throw new Error("Duplicate controls must be inside <DuplicateControls>.");
+  return value;
+}
+
+export function DuplicateControls({ potholeId, children }: { potholeId: string; children: ReactNode }) {
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(saveDuplicateAction, undefined);
+  return (
+    <DuplicateContext.Provider value={{ potholeId, formAction, pending }}>
+      <FormStatus state={state} />
+      {children}
+    </DuplicateContext.Provider>
+  );
+}
+
 export function MarkDuplicateButton({
-  potholeId,
   canonicalId,
   label,
   disabled,
 }: {
-  potholeId: string;
   canonicalId: string;
   label: string;
   disabled: boolean;
 }) {
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(
-    markDuplicateAction.bind(null, potholeId),
-    undefined,
-  );
+  const { potholeId, formAction, pending } = useDuplicateContext();
   return (
     <form action={formAction} className="inline-form">
+      <PotholeIdField potholeId={potholeId} />
+      <input type="hidden" name="duplicate_intent" value="link" />
       <input type="hidden" name="canonical_id" value={canonicalId} />
       <button type="submit" className="secondary" disabled={disabled || pending}>
         {pending ? "Linking…" : `Mark this record as a duplicate of ${label}`}
       </button>
-      <FormStatus state={state} />
     </form>
   );
 }
 
-export function DuplicateByIdForm({ potholeId, disabled }: { potholeId: string; disabled: boolean }) {
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(
-    markDuplicateAction.bind(null, potholeId),
-    undefined,
-  );
+export function DuplicateByIdForm({ disabled }: { disabled: boolean }) {
+  const { potholeId, formAction, pending } = useDuplicateContext();
   return (
     <form action={formAction} className="stack">
+      <PotholeIdField potholeId={potholeId} />
+      <input type="hidden" name="duplicate_intent" value="link" />
       <div className="field">
         <label htmlFor="canonical_id">Main record id (for records farther away)</label>
         <input id="canonical_id" name="canonical_id" className="mono" required disabled={disabled} />
       </div>
-      <FormStatus state={state} />
       <button type="submit" className="secondary" disabled={disabled || pending}>
         Link as duplicate
       </button>
@@ -141,46 +159,24 @@ export function DuplicateByIdForm({ potholeId, disabled }: { potholeId: string; 
   );
 }
 
-function SimpleActionButton({
-  action,
-  label,
-  pendingLabel,
-  className,
-  disabled,
-}: {
-  /** A bound server action, passed straight through so the form also works without JavaScript. */
-  action: (prev: ActionState, form: FormData) => Promise<ActionState>;
-  label: string;
-  pendingLabel: string;
-  className?: string;
-  disabled?: boolean;
-}) {
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(action, undefined);
+export function UnlinkDuplicateButton({ disabled }: { disabled: boolean }) {
+  const { potholeId, formAction, pending } = useDuplicateContext();
   return (
     <form action={formAction} className="stack">
-      <FormStatus state={state} />
-      <button type="submit" className={className} disabled={disabled || pending}>
-        {pending ? pendingLabel : label}
+      <PotholeIdField potholeId={potholeId} />
+      <input type="hidden" name="duplicate_intent" value="unlink" />
+      <button type="submit" className="secondary" disabled={disabled || pending}>
+        {pending ? "Unlinking…" : "Unlink duplicate"}
       </button>
     </form>
   );
 }
 
-export function UnlinkDuplicateButton({ potholeId, disabled }: { potholeId: string; disabled: boolean }) {
-  return (
-    <SimpleActionButton
-      action={unlinkDuplicateAction.bind(null, potholeId)}
-      label="Unlink duplicate"
-      pendingLabel="Unlinking…"
-      className="secondary"
-      disabled={disabled}
-    />
-  );
-}
+// ---------------------------------------------------------------------------
 
 /**
- * Approve and withdraw share one mounted component with one result line, so
- * the confirmation stays visible (and is announced) when the button swaps.
+ * Approve and withdraw share one action and one result line, so the
+ * confirmation stays visible (and is announced) when the button swaps.
  */
 export function ApprovalControls({
   potholeId,
@@ -193,12 +189,11 @@ export function ApprovalControls({
   canApprove: boolean;
   locked: boolean;
 }) {
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(
-    approved ? revokeApprovalAction.bind(null, potholeId) : approveDraftAction.bind(null, potholeId),
-    undefined,
-  );
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(saveApprovalAction, undefined);
   return (
     <form action={formAction} className="stack">
+      <PotholeIdField potholeId={potholeId} />
+      <input type="hidden" name="approval_intent" value={approved ? "revoke" : "approve"} />
       <FormStatus state={state} />
       {approved ? (
         <button type="submit" className="secondary" disabled={locked || pending}>

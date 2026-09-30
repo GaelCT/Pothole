@@ -166,8 +166,8 @@ written by a newer schema.
 
 ## Known gaps (planned for later stages)
 
-- The review page needs JavaScript. With JavaScript off, most review forms hang when submitted
-  instead of saving. Approving works either way.
+- Drawing redaction boxes and dragging the pin need JavaScript. Every review form still submits
+  and saves with JavaScript off.
 - Redaction is manual black boxes only. There is no automatic face or plate detection, per the
   plan.
 - Real map tiles have not been tested yet, because no MapTiler key is configured. Everything

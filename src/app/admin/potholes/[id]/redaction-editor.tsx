@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { saveRedactionAction, type ActionState } from "./actions";
 import { FormStatus } from "./form-status";
+import { PotholeIdField } from "./review-controls";
 import type { RedactionBox } from "@/lib/review-rules";
 
 type Draft = { x0: number; y0: number; x1: number; y1: number };
@@ -33,10 +34,7 @@ export function RedactionEditor({
   initiallyReviewed: boolean;
   locked: boolean;
 }) {
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(
-    saveRedactionAction.bind(null, potholeId),
-    undefined,
-  );
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(saveRedactionAction, undefined);
   const [boxes, setBoxes] = useState<RedactionBox[]>(initialBoxes);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [numeric, setNumeric] = useState({ x: "", y: "", width: "", height: "" });
@@ -120,6 +118,7 @@ export function RedactionEditor({
 
   return (
     <form action={formAction} className="stack wide">
+      <PotholeIdField potholeId={potholeId} />
       <div className="redaction-layout">
         <div>
           <h3>Original upload (private)</h3>

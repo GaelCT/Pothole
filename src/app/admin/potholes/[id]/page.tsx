@@ -22,6 +22,7 @@ import {
   ApprovalControls,
   DecisionsForm,
   DuplicateByIdForm,
+  DuplicateControls,
   MarkDuplicateButton,
   UnlinkDuplicateButton,
 } from "./review-controls";
@@ -144,6 +145,8 @@ export default async function ReviewPage(props: PageProps<"/admin/potholes/[id]"
 
       <section aria-labelledby="duplicates-heading">
         <h2 id="duplicates-heading">3. Duplicates</h2>
+        {/* One wrapper around both branches keeps the result message mounted. */}
+        <DuplicateControls key={row.id} potholeId={row.id}>
         {row.review_status === "duplicate" ? (
           <div className="stack wide">
             <p>
@@ -155,7 +158,7 @@ export default async function ReviewPage(props: PageProps<"/admin/potholes/[id]"
               )}
               . It stays off the map and cannot be reported.
             </p>
-            <UnlinkDuplicateButton potholeId={row.id} disabled={lock !== null} />
+            <UnlinkDuplicateButton disabled={lock !== null} />
           </div>
         ) : (
           <div className="stack wide">
@@ -204,7 +207,6 @@ export default async function ReviewPage(props: PageProps<"/admin/potholes/[id]"
                           <span className="hint">Cannot be the main record: {cannot}</span>
                         ) : (
                           <MarkDuplicateButton
-                            potholeId={row.id}
                             canonicalId={n.id}
                             label="this record"
                             disabled={lock !== null}
@@ -218,10 +220,11 @@ export default async function ReviewPage(props: PageProps<"/admin/potholes/[id]"
             )}
             <details>
               <summary>Link to a record by id</summary>
-              <DuplicateByIdForm potholeId={row.id} disabled={lock !== null || duplicates.length > 0} />
+              <DuplicateByIdForm disabled={lock !== null || duplicates.length > 0} />
             </details>
           </div>
         )}
+        </DuplicateControls>
       </section>
 
       <section aria-labelledby="decisions-heading">

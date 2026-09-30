@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import type { Marker } from "leaflet";
 import { saveDetailsAction, type ActionState } from "./actions";
 import { FormStatus } from "./form-status";
+import { PotholeIdField } from "./review-controls";
 import { MapStatusMessages } from "@/components/map/map-status";
 import { useMapTilerMap } from "@/components/map/use-maptiler-map";
 
@@ -35,10 +36,7 @@ export function DetailsForm({
   mapKey: string | null;
   locked: boolean;
 }) {
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(
-    saveDetailsAction.bind(null, potholeId),
-    undefined,
-  );
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(saveDetailsAction, undefined);
   const [lat, setLat] = useState(String(initial.latitude));
   const [lon, setLon] = useState(String(initial.longitude));
   const containerRef = useRef<HTMLDivElement>(null);
@@ -106,6 +104,7 @@ export function DetailsForm({
 
   return (
     <form action={formAction} className="stack wide">
+      <PotholeIdField potholeId={potholeId} />
       <MapStatusMessages
         mapKey={mapKey}
         keyError={keyError}

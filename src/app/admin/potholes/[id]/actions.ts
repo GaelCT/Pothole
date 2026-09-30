@@ -25,16 +25,27 @@ import {
  * Stage 4 review actions. Each one re-checks the admin session (rendering the
  * page is not a security boundary), validates its input, and delegates the
  * write to src/lib/review.ts. Next.js applies its Origin check to every action.
+ *
+ * Every action is unbound: `(previousState, formData)`, with the record id in
+ * a hidden `pothole_id` field. Do not switch back to
+ * `action.bind(null, id)` inside a client component. After a no-JavaScript
+ * POST, React's server renderer checks the posted action against each
+ * useActionState hook. For a bound action that check waits on the binding's
+ * promise and suspends, and each retry re-renders the component, creating a
+ * fresh binding that suspends again, so the response never finishes. Unbound
+ * actions are checked synchronously. The id was client-supplied either way,
+ * and it is validated here exactly as before.
  */
 
 export type ActionState = ReviewResult | undefined;
 
-async function guard(potholeId: unknown): Promise<string | ReviewResult> {
+async function guard(form: FormData): Promise<string | ReviewResult> {
   if (!(await getAdminSession())) return { ok: false, error: "Your session has expired. Sign in again." };
-  if (typeof potholeId !== "string" || !UUID_RE.test(potholeId)) {
+  const id = form.get("pothole_id");
+  if (typeof id !== "string" || !UUID_RE.test(id)) {
     return { ok: false, error: "Invalid record id." };
   }
-  return potholeId;
+  return id;
 }
 
 // Re-render the review page (and the records list) with the saved data.
@@ -46,12 +57,8 @@ function finish(id: string, result: ReviewResult): ReviewResult {
   return result;
 }
 
-export async function saveDetailsAction(
-  potholeId: string,
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  const id = await guard(potholeId);
+export async function saveDetailsAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const id = await guard(form);
   if (typeof id !== "string") return id;
 
   const lat = parseLatitude(form.get("latitude"));
@@ -66,7 +73,8 @@ export async function saveDetailsAction(
   if (errors.length > 0 || !lat.ok || !lon.ok || !desc.ok || !lane.ok) {
     return { ok: false, error: errors.join(" ") };
   }
-  return finish(id, 
+  return finish(
+    id,
     updateDetails(id, {
       latitude: lat.value,
       longitude: lon.value,
@@ -76,12 +84,8 @@ export async function saveDetailsAction(
   );
 }
 
-export async function saveDecisionsAction(
-  potholeId: string,
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  const id = await guard(potholeId);
+export async function saveDecisionsAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const id = await guard(form);
   if (typeof id !== "string") return id;
 
   const status = form.get("review_status");
@@ -92,7 +96,8 @@ export async function saveDecisionsAction(
   if (privacy !== "undecided" && privacy !== "private" && privacy !== "public") {
     return { ok: false, error: "Choose a privacy option." };
   }
-  return finish(id, 
+  return finish(
+    id,
     updateDecisions(id, {
       reviewStatus: status,
       locationVerified: form.get("location_verified") === "on",
@@ -103,36 +108,26 @@ export async function saveDecisionsAction(
   );
 }
 
-export async function markDuplicateAction(
-  potholeId: string,
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  const id = await guard(potholeId);
+/**
+ * Link and unlink share one action so a single, always-mounted useActionState
+ * owns the result message, including after a no-JavaScript POST, where React
+ * only restores state to the hook whose action matches the posted one.
+ */
+export async function saveDuplicateAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const id = await guard(form);
   if (typeof id !== "string") return id;
+  const intent = form.get("duplicate_intent");
+  if (intent === "unlink") return finish(id, unlinkDuplicate(id));
+  if (intent !== "link") return { ok: false, error: "Unknown duplicate action." };
   const canonical = form.get("canonical_id");
-  if (typeof canonical !== "string" || !UUID_RE.test(canonical)) {
+  if (typeof canonical !== "string" || !UUID_RE.test(canonical.trim())) {
     return { ok: false, error: "Choose the main record." };
   }
-  return finish(id, markDuplicate(id, canonical));
+  return finish(id, markDuplicate(id, canonical.trim()));
 }
 
-export async function unlinkDuplicateAction(
-  potholeId: string,
-  _prev?: ActionState,
-  _form?: FormData,
-): Promise<ActionState> {
-  const id = await guard(potholeId);
-  if (typeof id !== "string") return id;
-  return finish(id, unlinkDuplicate(id));
-}
-
-export async function saveRedactionAction(
-  potholeId: string,
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  const id = await guard(potholeId);
+export async function saveRedactionAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const id = await guard(form);
   if (typeof id !== "string") return id;
   const raw = form.get("boxes");
   if (typeof raw !== "string" || raw.length > 20_000) {
@@ -147,22 +142,12 @@ export async function saveRedactionAction(
   return finish(id, await saveRedaction(id, boxes, form.get("confirm_reviewed") === "on"));
 }
 
-export async function approveDraftAction(
-  potholeId: string,
-  _prev?: ActionState,
-  _form?: FormData,
-): Promise<ActionState> {
-  const id = await guard(potholeId);
+/** Approve and withdraw share one action for the same reason as duplicates. */
+export async function saveApprovalAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const id = await guard(form);
   if (typeof id !== "string") return id;
-  return finish(id, approveDraft(id));
-}
-
-export async function revokeApprovalAction(
-  potholeId: string,
-  _prev?: ActionState,
-  _form?: FormData,
-): Promise<ActionState> {
-  const id = await guard(potholeId);
-  if (typeof id !== "string") return id;
-  return finish(id, revokeApproval(id));
+  const intent = form.get("approval_intent");
+  if (intent === "approve") return finish(id, approveDraft(id));
+  if (intent === "revoke") return finish(id, revokeApproval(id));
+  return { ok: false, error: "Unknown approval action." };
 }
