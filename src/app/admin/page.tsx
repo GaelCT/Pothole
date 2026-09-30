@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { requireAdminPage } from "@/lib/session";
 import { listAllPotholesForAdmin, type AdminPothole } from "@/lib/potholes";
 import { logout } from "@/app/actions/auth";
@@ -50,8 +51,8 @@ export default async function AdminPage() {
       <section aria-labelledby="records-heading">
         <h2 id="records-heading">Records ({potholes.length})</h2>
         <p className="hint">
-          Review, verification, publishing, and duplicate linking arrive in Stage 4. Rows marked
-          DEV FIXTURE are development test data and must never be filed with the city.
+          Open a record to review its photo, pin, duplicates, and report draft. Rows marked DEV
+          FIXTURE are development test data and must never be filed with the city.
         </p>
         {potholes.length === 0 ? (
           <p>No records yet.</p>
@@ -68,6 +69,9 @@ export default async function AdminPage() {
                   <th scope="col">City privacy</th>
                   <th scope="col">Public map</th>
                   <th scope="col">Report</th>
+                  <th scope="col">
+                    <span className="visually-hidden">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -103,6 +107,11 @@ export default async function AdminPage() {
                     <td>{privacyLabel(p.keepCityRequestPrivate)}</td>
                     <td>{p.isPublic ? "Shown" : "Hidden"}</td>
                     <td>{REPORT_LABELS[p.reportStatus]}</td>
+                    <td>
+                      <Link href={`/admin/potholes/${p.id}`}>
+                        Review<span className="visually-hidden">: {p.locationDescription}</span>
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>

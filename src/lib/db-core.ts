@@ -68,6 +68,12 @@ export type PotholeRow = {
   is_fixture: SqlBool;
   created_at: string;
   updated_at: string;
+  /** Metadata-stripped, black-box-redacted copy. The only file ever shown publicly or filed. */
+  redacted_photo_path: string | null;
+  /** JSON array of RedactionBox, in auto-oriented original-image pixels. */
+  redaction_boxes: string | null;
+  /** Reviewer confirmed no identifiable faces or plates remain in the redacted copy. */
+  photo_reviewed: SqlBool;
 };
 
 export type ReportAttemptRow = {
@@ -153,6 +159,16 @@ const MIGRATIONS: Migration[] = [
       CREATE UNIQUE INDEX report_attempts_one_open_per_pothole
         ON report_attempts(pothole_id)
         WHERE outcome IN ('in_progress', 'outcome_unknown');
+    `,
+  },
+  {
+    version: 2,
+    name: "redacted photo copy and photo review",
+    sql: `
+      ALTER TABLE potholes ADD COLUMN redacted_photo_path TEXT;
+      ALTER TABLE potholes ADD COLUMN redaction_boxes TEXT;
+      ALTER TABLE potholes ADD COLUMN photo_reviewed INTEGER NOT NULL DEFAULT 0
+        CHECK (photo_reviewed IN (0, 1));
     `,
   },
 ];

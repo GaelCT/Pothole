@@ -4,14 +4,17 @@ import type { PotholeRow, ReportStatus, ReviewStatus } from "./db-core.ts";
 import { getDb } from "./db.ts";
 import { getConfig } from "./config.ts";
 import { deletePhoto, writePhoto } from "./photo-files.ts";
+import { distanceMeters, publicBlockers } from "./review-rules.ts";
 
 /**
  * The single definition of "visible to the public". Everything public (the
- * list API, photo access, and the Stage 3 map) must go through this rule.
+ * list API, photo access, and the maps) must go through this rule. It is the
+ * SQL form of publicBlockers() in review-rules.ts; keep the two in step.
  *
  * - verified, not a duplicate, pin confirmed by the reviewer
  * - explicitly published
  * - explicitly NOT a private city request (NULL = undecided = hidden)
+ * - a reviewed, metadata-stripped photo copy exists
  * - in production, never a development fixture
  */
 function publicWhere(): string {
@@ -19,19 +22,14 @@ function publicWhere(): string {
     AND duplicate_of IS NULL
     AND location_verified = 1
     AND publish_on_map = 1
-    AND keep_city_request_private = 0`;
+    AND keep_city_request_private = 0
+    AND redacted_photo_path IS NOT NULL
+    AND photo_reviewed = 1`;
   return getConfig().isProduction ? `${base} AND is_fixture = 0` : base;
 }
 
 export function isPubliclyVisible(row: PotholeRow): boolean {
-  return (
-    row.review_status === "verified" &&
-    row.duplicate_of === null &&
-    row.location_verified === 1 &&
-    row.publish_on_map === 1 &&
-    row.keep_city_request_private === 0 &&
-    !(getConfig().isProduction && row.is_fixture === 1)
-  );
+  return publicBlockers(row, getConfig().isProduction).length === 0;
 }
 
 /** Fields safe to show anonymous visitors. No paths, snapshots, or receipts. */
@@ -106,7 +104,9 @@ export type AdminPothole = {
   reportStatus: ReportStatus;
   isFixture: boolean;
   isPublic: boolean;
+  /** Admin-only URL of the original upload. */
   photoUrl: string;
+  hasReviewedPhoto: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -129,10 +129,69 @@ function toAdmin(row: PotholeRow): AdminPothole {
     reportStatus: row.report_status,
     isFixture: row.is_fixture === 1,
     isPublic: isPubliclyVisible(row),
-    photoUrl: `/api/photos/${row.id}`,
+    photoUrl: `/api/photos/${row.id}?variant=original`,
+    hasReviewedPhoto: row.redacted_photo_path !== null && row.photo_reviewed === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+export type NearbyPothole = {
+  id: string;
+  latitude: number;
+  longitude: number;
+  locationDescription: string;
+  reviewStatus: ReviewStatus;
+  duplicateOf: string | null;
+  distanceMeters: number;
+  photoUrl: string;
+  isFixture: boolean;
+};
+
+/**
+ * Other records within `radiusMeters`, nearest first, for duplicate review.
+ * Shown to the reviewer only; nothing is merged automatically, because two
+ * nearby potholes can be distinct.
+ */
+export function listNearbyPotholes(row: PotholeRow, radiusMeters = 150): NearbyPothole[] {
+  // Coarse bounding box in SQL, exact distance in JS.
+  const dLat = radiusMeters / 111_000;
+  const dLon = radiusMeters / (111_000 * Math.max(0.1, Math.cos((row.latitude * Math.PI) / 180)));
+  const candidates = getDb()
+    .prepare(
+      `SELECT * FROM potholes
+       WHERE id <> ? AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?`,
+    )
+    .all(
+      row.id,
+      row.latitude - dLat,
+      row.latitude + dLat,
+      row.longitude - dLon,
+      row.longitude + dLon,
+    ) as PotholeRow[];
+  return candidates
+    .map((c) => ({ c, d: distanceMeters(row, c) }))
+    .filter(({ d }) => d <= radiusMeters)
+    .sort((a, b) => a.d - b.d)
+    .map(({ c, d }) => ({
+      id: c.id,
+      latitude: c.latitude,
+      longitude: c.longitude,
+      locationDescription: c.location_description,
+      reviewStatus: c.review_status,
+      duplicateOf: c.duplicate_of,
+      distanceMeters: Math.round(d),
+      photoUrl: `/api/photos/${c.id}?variant=original`,
+      isFixture: c.is_fixture === 1,
+    }));
+}
+
+export function listDuplicatesOf(id: string): { id: string; locationDescription: string }[] {
+  return (
+    getDb()
+      .prepare("SELECT id, location_description FROM potholes WHERE duplicate_of = ? ORDER BY created_at")
+      .all(id) as { id: string; location_description: string }[]
+  ).map((r) => ({ id: r.id, locationDescription: r.location_description }));
 }
 
 /** Admin only. Callers must have authorized the request. */

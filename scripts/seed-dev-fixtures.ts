@@ -12,7 +12,9 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { dbFilePath, openDatabase, type PotholeRow } from "../src/lib/db-core.ts";
+import { buildSnapshot, parseSnapshot } from "../src/lib/review-rules.ts";
 import { photosDir, writePhoto } from "../src/lib/photo-files.ts";
 import { fixturePng } from "./fixture-png.ts";
 
@@ -217,53 +219,91 @@ for (const f of FIXTURES) {
   if (!fs.existsSync(path.join(photosDir(dataDir), photoName))) {
     writePhoto(dataDir, fixturePng(f.stripe), f.id);
   }
-  const snapshot = f.submittedAt
-    ? JSON.stringify({
-        fixture: true,
-        latitude: f.latitude,
-        longitude: f.longitude,
-        location_description: f.location_description,
-        lane_direction: f.lane_direction,
-        observed_at: f.observed_at,
-        photo_path: photoName,
-      })
-    : null;
-  db.transaction(() => {
-    insert.run({
-      id: f.id,
-      latitude: f.latitude,
-      longitude: f.longitude,
-      location_description: f.location_description,
-      lane_direction: f.lane_direction,
-      observed_at: f.observed_at,
-      photo_path: photoName,
-      review_status: f.review_status,
-      duplicate_of: f.duplicate_of,
-      location_verified: f.location_verified,
-      city_service_verified: f.city_service_verified,
-      publish_on_map: f.publish_on_map,
-      keep_city_request_private: f.keep_city_request_private,
-      report_status: f.submittedAt ? "submitted" : "not_sent",
-      approved_snapshot: snapshot,
-      approved_at: f.submittedAt ?? null,
-      submitted_at: f.submittedAt ?? null,
-      now: new Date().toISOString(),
-    });
-    if (f.submittedAt && snapshot) {
-      insertAttempt.run({
-        id: f.id.replace(/^00000000/, "a0000000"),
-        pothole_id: f.id,
-        snapshot,
-        started_at: f.submittedAt,
-        finished_at: f.submittedAt,
-        notes: "DEV FIXTURE: simulated filing, nothing was sent to the city.",
-      });
-    }
-  })();
+  insert.run({
+    id: f.id,
+    latitude: f.latitude,
+    longitude: f.longitude,
+    location_description: f.location_description,
+    lane_direction: f.lane_direction,
+    observed_at: f.observed_at,
+    photo_path: photoName,
+    review_status: f.review_status,
+    duplicate_of: f.duplicate_of,
+    location_verified: f.location_verified,
+    city_service_verified: f.city_service_verified,
+    publish_on_map: f.publish_on_map,
+    keep_city_request_private: f.keep_city_request_private,
+    report_status: f.submittedAt ? "submitted" : "not_sent",
+    approved_snapshot: null,
+    approved_at: null,
+    submitted_at: f.submittedAt ?? null,
+    now: new Date().toISOString(),
+  });
   added++;
   console.log(`  added    ${f.id}  ${f.purpose}`);
 }
+
+// Bring every fixture up to the current review model (also upgrades fixtures
+// created by earlier versions of this script):
+// - verified fixtures get a reviewed photo copy (the synthetic PNG has no
+//   metadata and nothing to redact, so the copy is byte-identical)
+// - "submitted" fixtures get an approval snapshot and a simulated attempt
+const selectRow = db.prepare("SELECT * FROM potholes WHERE id = ?");
+const attemptExists = db.prepare("SELECT 1 FROM report_attempts WHERE pothole_id = ?").pluck();
+let upgraded = 0;
+for (const f of FIXTURES) {
+  let row = selectRow.get(f.id) as PotholeRow;
+  const changes: string[] = [];
+
+  if (f.review_status === "verified" && row.redacted_photo_path === null) {
+    const reviewedId = f.id.replace(/^00000000/, "b0000000");
+    const reviewedName = `${reviewedId}.png`;
+    if (!fs.existsSync(path.join(photosDir(dataDir), reviewedName))) {
+      const original = fs.readFileSync(path.join(photosDir(dataDir), row.photo_path));
+      writePhoto(dataDir, original, reviewedId);
+    }
+    db.prepare(
+      "UPDATE potholes SET redacted_photo_path = ?, redaction_boxes = '[]', photo_reviewed = 1 WHERE id = ?",
+    ).run(reviewedName, f.id);
+    changes.push("reviewed photo copy");
+    row = selectRow.get(f.id) as PotholeRow;
+  }
+
+  if (f.submittedAt && parseSnapshot(row.approved_snapshot) === null) {
+    const sha = createHash("sha256")
+      .update(fs.readFileSync(path.join(photosDir(dataDir), row.redacted_photo_path!)))
+      .digest("hex");
+    const snapshot = JSON.stringify(buildSnapshot(row, sha));
+    db.transaction(() => {
+      db.prepare("UPDATE potholes SET approved_snapshot = ?, approved_at = ? WHERE id = ?").run(
+        snapshot,
+        f.submittedAt,
+        f.id,
+      );
+      if (attemptExists.get(f.id)) {
+        db.prepare("UPDATE report_attempts SET snapshot = ? WHERE pothole_id = ?").run(snapshot, f.id);
+      } else {
+        insertAttempt.run({
+          id: f.id.replace(/^00000000/, "a0000000"),
+          pothole_id: f.id,
+          snapshot,
+          started_at: f.submittedAt,
+          finished_at: f.submittedAt,
+          notes: "DEV FIXTURE: simulated filing, nothing was sent to the city.",
+        });
+      }
+    })();
+    changes.push("approval snapshot");
+  }
+
+  if (changes.length > 0) {
+    upgraded++;
+    console.log(`  upgraded ${f.id}  ${changes.join(", ")}`);
+  }
+}
 db.close();
 
-console.log(`\nDevelopment fixtures: ${added} added, ${FIXTURES.length - added} already present.`);
+console.log(
+  `\nDevelopment fixtures: ${added} added, ${FIXTURES.length - added} already present, ${upgraded} upgraded.`,
+);
 console.log(`Database: ${dbFilePath(dataDir)}`);

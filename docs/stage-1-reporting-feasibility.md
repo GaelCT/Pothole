@@ -92,6 +92,17 @@ Retrieved from the create-request page without interacting with any control and 
 
 **Finding C — "Where is the request?" is ambiguous.** The same label appears twice, once near a generic chooser and once near location selection. Whether the category/type selector shares this label, or whether the readable content collapsed two distinct sections, cannot be determined without live inspection. The plan assumes a distinct "report type" step; that assumption is not yet verified.
 
+### Update, September 29, 2026: screenshot of the live form
+
+The operator shared a screenshot of the create-request page as rendered in a browser. It shows:
+
+- Five numbered steps: **1. Select a Report Type** (required, opens a chooser), **2. Where is the request?** (required, Mapbox map with "Select Location" and a locate-me arrow), **3. Tell us more details** (required), **4. Add photos, videos, or audio** (attachment button, **no required marker**), **5. Privacy** ("Keep this request private"), then **SUBMIT**.
+- **Finding C is resolved:** the report type is its own first step, separate from location.
+- **Finding B is corrected:** in the rendered form the media step is optional. Requiring a photo is this project's policy, not the city's.
+- **U4 is partly answered:** location is set on a map. No coordinate text field is visible.
+- The notification prompt (Finding A) is not visible before submitting. It likely appears after SUBMIT; still unconfirmed.
+- **U1 is still open:** the report-type options were not shown. The Stage 4 draft does not name a category for that reason.
+
 ## 4. What remains UNKNOWN
 
 Nothing in this section may be guessed. Each item is answerable only by authorized inspection of the live flow.

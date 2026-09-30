@@ -14,7 +14,7 @@ Stage 1 findings are in [`docs/stage-1-reporting-feasibility.md`](docs/stage-1-r
 | 1. Reporting feasibility | Done. Decision: manual filing, no form automation |
 | 2. App foundation | Done: database, private photos, admin sign-in, dev fixtures |
 | 3. Map interface | Done: public map on `/` with filters, list and a detail panel; map of reported potholes on `/login`; CSP. Map tiles need `MAPTILER_KEY` |
-| 4. Review and report drafting | Not started |
+| 4. Review and report drafting | Done: review page at `/admin/potholes/<id>` with photo redaction, pin editing, duplicates, decisions, draft and approval |
 | 5. Manual filing support | Not started |
 | 6. Test and deploy | Not started |
 
@@ -62,12 +62,45 @@ npm run dev           # http://localhost:3000
 
 Sign in at `/login` and go to `/admin`.
 
+## Reviewing a record (Stage 4)
+
+On `/admin`, choose **Review** next to a record. Work through the page from top to bottom:
+
+1. **Photo.** Drag on the original photo to cover faces, license plates, house numbers and so
+   on with solid black boxes. There's also a keyboard option for adding a box by coordinates.
+   **Save photo copy** creates the only version that is ever shown publicly or filed: EXIF
+   orientation is applied, all metadata (EXIF, GPS, XMP, ICC) is removed, and the boxes are
+   painted in. The original upload stays private and admin-only, so you can redo a redaction.
+   Tick the confirmation once nothing identifying remains.
+2. **Location and description.** Drag the pin, click the map, or type the coordinates. Nearby
+   records appear as grey dots. Moving the pin clears the "location confirmed" decision, so
+   you confirm it again.
+3. **Duplicates.** Records within 150 m are listed with their photos. Linking one to a main
+   record hides it from the map and blocks reporting it. Nothing is merged automatically.
+   Chains aren't allowed: the main record can't itself be a duplicate, and a record that others
+   point to can't become one.
+4. **Review decisions.** Set the review status, confirm the pin and the city's responsibility
+   for the road, choose city-request privacy, and choose whether to publish. The page lists
+   what still keeps the record off the public map.
+5. **City report draft.** Shown in the city form's order, with the description built from the
+   plan's fixed template. Approving saves an exact snapshot, including a SHA-256 hash of the
+   photo copy.
+   - Any later change to the text, pin, privacy, review status or photo clears the approval.
+     Toggling "publish on map" doesn't.
+   - The page flags an approval that no longer matches the record or photo bytes.
+   - Once filing starts (Stage 5), the record is locked.
+
+The draft doesn't name the city's report category, because the exact option hasn't been
+confirmed. You choose it on the city form.
+
 ## Development fixtures
 
 `npm run db:seed-dev` loads eight records covering each visibility case: two public, one needing
 review, one rejected, one duplicate, one private, and two public records marked as submitted to
 the city (with no city request number, since none was ever issued). Their descriptions start with
-`[DEV FIXTURE]`, and their photos are striped images stamped "DEV FIXTURE / NOT REAL".
+`[DEV FIXTURE]`, and their photos are striped images stamped "DEV FIXTURE / NOT REAL". Verified
+fixtures get a reviewed photo copy. Re-running the script also upgrades fixtures created by
+older versions. Fixtures can't be approved for filing in production.
 
 - The script refuses to run when `NODE_ENV=production`.
 - Re-running it adds nothing new, because fixture IDs are fixed.
@@ -94,10 +127,13 @@ the city (with no city request number, since none was ever issued). Their descri
   - its pin has been confirmed
   - it is explicitly published
   - it is explicitly not private
+  - it has a saved photo copy with the review confirmed
   - in production, it is not a fixture
 
-  The rule is defined once in `src/lib/potholes.ts`. Hidden and nonexistent records both return
-  404.
+  The rule is written twice: in SQL in `src/lib/potholes.ts` and as `publicBlockers` in
+  `src/lib/review-rules.ts`. The two must stay in step. Visitors only ever get the reviewed photo
+  copy. The original upload (`?variant=original`) is admin-only. Hidden and nonexistent records
+  both return 404.
 - **The administrator** signs in with the single account from `.env.local`.
   - Sessions are encrypted `HttpOnly` cookies that expire after 8 hours. In production they are
     also `Secure` and use the `__Host-` prefix.
@@ -130,9 +166,10 @@ written by a newer schema.
 
 ## Known gaps (planned for later stages)
 
-- Photos are stored exactly as uploaded. Removing EXIF/GPS metadata and redacting faces or
-  plates is part of Stage 4 review. Records created through the admin form stay hidden until
-  that review exists, so no uploaded photo can become public before then.
+- The review page needs JavaScript. With JavaScript off, most review forms hang when submitted
+  instead of saving. Approving works either way.
+- Redaction is manual black boxes only. There is no automatic face or plate detection, per the
+  plan.
 - Real map tiles have not been tested yet, because no MapTiler key is configured. Everything
   else on the map page works without a key and was tested.
 
