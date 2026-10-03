@@ -15,7 +15,7 @@ Stage 1 findings are in [`docs/stage-1-reporting-feasibility.md`](docs/stage-1-r
 | 2. App foundation | Done: database, private photos, admin sign-in, dev fixtures |
 | 3. Map interface | Done: public map on `/` with filters, list and a detail panel; map of reported potholes on `/login`; CSP. Map tiles need `MAPTILER_KEY` |
 | 4. Review and report drafting | Done: review page at `/admin/potholes/<id>` with photo redaction, pin editing, duplicates, decisions, draft and approval |
-| 5. Manual filing support | Not started |
+| 5. Manual filing support | Done: filing page at `/admin/potholes/<id>/file` and history at `/admin/reports` |
 | 6. Test and deploy | Not started |
 
 ## Requirements
@@ -92,6 +92,32 @@ On `/admin`, choose **Review** next to a record. Work through the page from top 
 
 The draft doesn't name the city's report category, because the exact option hasn't been
 confirmed. You choose it on the city form.
+
+## Filing a report (Stage 5)
+
+You file every report by hand on the city's site. This site never contacts the city.
+
+1. Open **File** for an approved record, from `/admin`, `/admin/reports` or the review page.
+2. **Start filing.** The record is locked against edits, and a second attempt can't open, even
+   from another tab or a double click.
+3. The page shows the approved report in the city form's order, with Copy buttons and a
+   download of the cleaned photo. Open the city form from the link and fill it in.
+4. Come back and record what happened:
+   - **Submitted:** the city confirmed it. Add the request number or link only if the city showed
+     one, plus an optional confirmation screenshot (up to 5 MB, admin-only).
+   - **Existing city request:** the city already had this pothole and you didn't file a new one.
+     Needs the request's number or link.
+   - **Outcome unknown:** the result was unclear. The record stays locked until you check your
+     city request history and record either "found it" or "not there". Nothing is retried.
+   - **Not sent:** nothing was submitted. The approved draft is ready to file again.
+
+`/admin/reports` lists outcome-unknown records first, then filings in progress, drafts ready to
+file, and every past attempt. Only "Submitted" and "Existing city request linked" count as
+reported, and a report is not a repair. Development fixtures can't be filed in production.
+Locally the page shows them with a "do not submit" warning and no link to the city form.
+
+Server Actions accept bodies up to 6 MB (`next.config.ts`) for the receipt screenshot. That
+stays under the proxy's 10 MB limit, past which it would cut the body short without an error.
 
 ## Development fixtures
 

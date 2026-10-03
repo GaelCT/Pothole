@@ -312,6 +312,11 @@ export default async function ReviewPage(props: PageProps<"/admin/potholes/[id]"
           canApprove={approvalReasons.length === 0}
           locked={lock !== null}
         />
+        {row.report_status !== "not_sent" && row.report_status !== "blocked" && (
+          <p>
+            <Link href={`/admin/potholes/${row.id}/file`}>Open the filing page</Link>
+          </p>
+        )}
       </section>
     </main>
   );

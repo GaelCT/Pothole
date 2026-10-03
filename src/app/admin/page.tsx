@@ -40,6 +40,9 @@ export default async function AdminPage() {
     <main>
       <header className="admin-header">
         <h1>Admin</h1>
+        <nav aria-label="Admin">
+          <Link href="/admin/reports">Reports</Link>
+        </nav>
         <form action={logout}>
           <span className="hint">Signed in as {admin.username} </span>
           <button type="submit" className="secondary">
@@ -111,6 +114,14 @@ export default async function AdminPage() {
                       <Link href={`/admin/potholes/${p.id}`}>
                         Review<span className="visually-hidden">: {p.locationDescription}</span>
                       </Link>
+                      {p.reportStatus !== "not_sent" && p.reportStatus !== "blocked" && (
+                        <>
+                          {" · "}
+                          <Link href={`/admin/potholes/${p.id}/file`}>
+                            File<span className="visually-hidden">: {p.locationDescription}</span>
+                          </Link>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}

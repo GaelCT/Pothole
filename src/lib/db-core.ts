@@ -87,6 +87,8 @@ export type ReportAttemptRow = {
   city_request_url: string | null;
   receipt_evidence: string | null;
   notes: string | null;
+  /** 1 when no new report was filed: the operator linked an existing city request instead. */
+  linked_existing: SqlBool;
 };
 
 const sqlList = (values: readonly string[]) =>
@@ -169,6 +171,14 @@ const MIGRATIONS: Migration[] = [
       ALTER TABLE potholes ADD COLUMN redaction_boxes TEXT;
       ALTER TABLE potholes ADD COLUMN photo_reviewed INTEGER NOT NULL DEFAULT 0
         CHECK (photo_reviewed IN (0, 1));
+    `,
+  },
+  {
+    version: 3,
+    name: "existing city request link on report attempts",
+    sql: `
+      ALTER TABLE report_attempts ADD COLUMN linked_existing INTEGER NOT NULL DEFAULT 0
+        CHECK (linked_existing IN (0, 1));
     `,
   },
 ];

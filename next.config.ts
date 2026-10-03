@@ -3,6 +3,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      // Receipt screenshots (up to 5 MB) are uploaded through a Server Action.
+      // Stay well under the proxy's 10 MB body limit, which truncates silently.
+      bodySizeLimit: "6mb",
+    },
+  },
   // Pin the project root; a stray lockfile higher up the tree confuses detection.
   turbopack: { root: path.join(__dirname) },
   async headers() {

@@ -67,6 +67,24 @@ export function parseRequiredText(raw: unknown, label: string, maxLength: number
   return ok(text);
 }
 
+/** Optional http(s) URL; anything else (javascript:, data:, relative) is rejected. */
+export function parseOptionalHttpUrl(raw: unknown, label: string): Result<string | null> {
+  if (raw === null || raw === undefined) return ok(null);
+  if (typeof raw !== "string") return fail(`${label} must be text.`);
+  const text = raw.trim();
+  if (text === "") return ok(null);
+  if (text.length > 500) return fail(`${label} must be at most 500 characters.`);
+  try {
+    const url = new URL(text);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      return fail(`${label} must start with https:// or http://.`);
+    }
+    return ok(url.href);
+  } catch {
+    return fail(`${label} is not a valid web address.`);
+  }
+}
+
 /** Optional text: empty becomes null, never a guessed value. */
 export function parseOptionalText(
   raw: unknown,

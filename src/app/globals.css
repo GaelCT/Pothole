@@ -603,3 +603,42 @@ label.check input {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ---- Stage 5 filing ---- */
+
+textarea {
+  font: inherit;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.copy-field {
+  margin: 0.5rem 0;
+  max-width: 44rem;
+}
+
+.copy-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.filing-photo {
+  display: block;
+  margin-top: 0.5rem;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+}
+
+.outcome {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.notes-cell {
+  white-space: pre-wrap;
+  max-width: 24rem;
+}
