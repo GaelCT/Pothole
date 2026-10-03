@@ -10,6 +10,13 @@ This is a website implementation roadmap, not a model-training plan. Every softw
 
 **Excluded:** model training, architecture changes, loading `best.pt`, inference, camera/video processing, GPS capture, image-to-GPS matching, and a detector-to-website connection. Your ML work stays separate. The website can be built and tested before the model is final.
 
+**Change after Stage 5 (operator decision):** the site now has an admin-only dashcam page (`/admin/detect`).
+- It plays a local video against a GPX track and interpolates the car's position between real track points.
+- It never invents a position: outside the track or across a gap over 10 s, there is none.
+- Hand-marked frames go to the review queue as unverified records with coordinates, time and photo filled in.
+- Automatic detection is still not connected. When it is, it will run an exported `best.onnx` in the browser with `onnxruntime-web`, scanning about 2 frames per second and grouping repeat detections. That approach is approved but not built.
+- Model training stays out of scope. GPS gives the car's position, so the Stage 4 pin review is still required.
+
 **No fallbacks:** one stack, one map provider, one city-reporting route. Missing data or a broken dependency produces a visible error and stops that action. No alternate APIs, email reporting, automatic retries, fabricated coordinates, or simulated success. Human review is part of the normal workflow, not a backup route.
 
 ## 2. What the finished workflow looks like
@@ -144,7 +151,7 @@ If automated form filling is ever reconsidered, it requires written permission f
 | 5. Manual filing support — **complete** | Copy-ready filing page, photo download, attempt lock, outcome recording, reporting history | Filing each real report by hand on the city site | Approved draft data is presented exactly, and the actual outcome is recorded |
 | 6. Test and deploy | Tests, deployment configuration, and a short operator guide | Approval of the tested website and one legitimate live report | Website and reporting workflow pass the checks below |
 
-Do not add model work to any stage. “Connect the final detector” remains a separate future project decision, not a hidden deliverable in this plan.
+Model training stays outside every stage. The dashcam page (section 1, "Change after Stage 5") is built for hand-marking. Connecting the detector to it is the next model step and needs the exported `best.onnx`.
 
 ## 9. Acceptance tests
 

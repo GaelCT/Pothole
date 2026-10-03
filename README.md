@@ -93,6 +93,28 @@ On `/admin`, choose **Review** next to a record. Work through the page from top 
 The draft doesn't name the city's report category, because the exact option hasn't been
 confirmed. You choose it on the city form.
 
+## Dashcam footage (`/admin/detect`)
+
+1. **Load the drive's video and its GPS track (GPX).** Both stay on your computer. The only thing
+   uploaded is the single JPEG frame you send.
+2. **Enter the time shown at 0:00 of the video,** read from the dashcam's on-screen timestamp.
+   Fine-tune with the offset until the yellow dot follows the blue track on the map.
+3. **Pause on the frame where the pothole is closest to the car** and choose **Mark pothole at
+   this frame**. Use the ±1 s and ±frame buttons to step.
+4. **Type a street description and send it.** It goes to the review queue unverified, with the
+   coordinates, observation time and full-resolution frame filled in. Lane is never filled in.
+
+Positions are interpolated only between real GPS points. Outside the track, or across a gap of
+more than 10 s, a frame has no position and can't be sent. GPS records where the car was, so
+you'll still drag the pin onto the pothole on the review page.
+
+If the browser can't play the video (dashcams often record H.265/HEVC), convert it first:
+`ffmpeg -i input.mp4 -c:v libx264 -crf 20 output.mp4`.
+
+**Automatic detection is not connected yet.** It needs the model exported to ONNX, for example
+`YOLO("best.pt").export(format="onnx", imgsz=640)`. It will run in the browser, and that step adds
+`onnxruntime-web` plus WebAssembly permission in the CSP for this page.
+
 ## Filing a report (Stage 5)
 
 You file every report by hand on the city's site. This site never contacts the city.

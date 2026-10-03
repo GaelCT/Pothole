@@ -41,7 +41,7 @@ export default async function AdminPage() {
       <header className="admin-header">
         <h1>Admin</h1>
         <nav aria-label="Admin">
-          <Link href="/admin/reports">Reports</Link>
+          <Link href="/admin/detect">Dashcam</Link> · <Link href="/admin/reports">Reports</Link>
         </nav>
         <form action={logout}>
           <span className="hint">Signed in as {admin.username} </span>

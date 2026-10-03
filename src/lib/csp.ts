@@ -45,6 +45,9 @@ export function buildContentSecurityPolicy(nonce: string, isDev: boolean): strin
     `img-src 'self' data: blob: ${mapTiles}`,
     // 'self' also covers the same-origin dev HMR WebSocket (ws://).
     `connect-src 'self' ${mapTiles}`,
+    // blob: lets the dashcam page play a video chosen from this computer
+    // (an object URL). Nothing is fetched from another origin.
+    "media-src 'self' blob:",
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
