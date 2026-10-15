@@ -16,7 +16,7 @@ Stage 1 findings are in [`docs/stage-1-reporting-feasibility.md`](docs/stage-1-r
 | 3. Map interface | Done: public map on `/` with filters, list and a detail panel; map of reported potholes on `/login`; CSP. Map tiles need `MAPTILER_KEY` |
 | 4. Review and report drafting | Done: review page at `/admin/potholes/<id>` with photo redaction, pin editing, duplicates, decisions, draft and approval |
 | 5. Manual filing support | Done: filing page at `/admin/potholes/<id>/file` and history at `/admin/reports` |
-| 6. Test and deploy | Not started |
+| 6. Test and deploy | Not started: acceptance checks, deployment configuration and operator approval remain |
 
 ## Requirements
 
@@ -52,6 +52,10 @@ Stage 1 findings are in [`docs/stage-1-reporting-feasibility.md`](docs/stage-1-r
 
 The server validates all four values when it starts. If any is missing or malformed, it logs
 every problem and serves nothing.
+
+For map tiles, also set `MAPTILER_KEY` in `.env.local`. Restrict the public key to the site's
+domains in MapTiler, check the account's usage limits, and verify that the required map
+attribution is displayed. Real tiles still need to be checked with a configured key.
 
 ## Run locally
 
@@ -111,9 +115,13 @@ you'll still drag the pin onto the pothole on the review page.
 If the browser can't play the video (dashcams often record H.265/HEVC), convert it first:
 `ffmpeg -i input.mp4 -c:v libx264 -crf 20 output.mp4`.
 
-**Automatic detection is not connected yet.** It needs the model exported to ONNX, for example
-`YOLO("best.pt").export(format="onnx", imgsz=640)`. It will run in the browser, and that step adds
-`onnxruntime-web` plus WebAssembly permission in the CSP for this page.
+**Automatic detection is not connected yet.** The approved next step needs an exported
+`best.onnx`, for example from `YOLO("best.pt").export(format="onnx", imgsz=640)`. The planned
+browser integration uses `onnxruntime-web`, scans about two frames per second, and groups
+repeat detections. It also needs WebAssembly permission in the CSP for this page. These are
+planned changes, not features of the current page. Model training stays outside this website
+project, and detector results will still need location and photo review before publication or
+filing.
 
 ## Filing a report (Stage 5)
 
@@ -123,7 +131,10 @@ You file every report by hand on the city's site. This site never contacts the c
 2. **Start filing.** The record is locked against edits, and a second attempt can't open, even
    from another tab or a double click.
 3. The page shows the approved report in the city form's order, with Copy buttons and a
-   download of the cleaned photo. Open the city form from the link and fill it in.
+   download of the cleaned photo. Open the city form from the link and fill it in. Check the
+   actual category and required questions, the city's selected position, successful photo
+   attachment, and the approved privacy choice. Deliberately accept or decline notification
+   subscription on the city form; it is an additional step documented during Stage 1.
 4. Come back and record what happened:
    - **Submitted:** the city confirmed it. Add the request number or link only if the city showed
      one, plus an optional confirmation screenshot (up to 5 MB, admin-only).
@@ -211,6 +222,36 @@ while the server is running, use SQLite's backup (for example
 
 Schema migrations are applied automatically at startup. The server refuses to open a database
 written by a newer schema.
+
+## Test and deploy (Stage 6)
+
+Stage 6 remains unfinished. The build plan's acceptance checks below are requirements to
+verify against local development fixtures, not a record of passing automated tests:
+
+1. Each map marker uses the record's exact coordinates and opens its matching photo.
+2. Unreviewed, rejected, duplicate and private records are not publicly exposed.
+3. Missing location, city-service confirmation, evidence photo or required details blocks
+   reporting.
+4. A duplicate links to one canonical record without adding another marker or city report.
+5. Double clicks and separate tabs cannot start two active filing attempts for one record.
+6. Editing an approved report field or photo invalidates the approval. The separate
+   "publish on map" toggle does not change the report snapshot.
+7. The filing page presents exactly the approved snapshot and photo.
+8. An unknown outcome blocks another filing attempt until manually reconciled, with no
+   automatic retry.
+9. Only a confirmed submission is recorded as submitted; request numbers and links are
+   stored only when the city actually provides them.
+10. Unauthenticated visitors cannot access private photos, drafts, secrets or write routes.
+
+Choose the persistent Node.js host, configure HTTPS and the production environment, and
+verify that the database and photos survive restarts and redeploys. Check real map tiles with
+the restricted MapTiler key. Complete the deployment configuration and short operator guide
+as part of this stage.
+
+After the acceptance checks pass, the operator must explicitly approve live use and one
+legitimate report with accurate evidence. File it by hand and record the city's actual
+response. Never submit development fixtures to the city, and do not mark a pothole repaired
+solely because a report was received.
 
 ## Known gaps (planned for later stages)
 
